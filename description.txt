@@ -1,0 +1,41 @@
+33. Programovatelný cyklický posuv vpravo
+Posuňte cyklicky dvojité slovo uložené v paměti (způsobem "little-endian“) na adrese 
+uložené v registru S vpravo o počet pozic, který je dán hodnotou registru L. Výsledek 
+uložte do paměti na adresu určenou v registru D. Nastavte příznaky.
+POPIS INSTRUKCE
+LITTLE ENDIAN!!!
+normal life: 3210
+obsah  adresy
+====
+| 0|  1000
+| 1|  1001
+----
+| 2|  1002
+| 3|  1003
+====
+[S] -> U; S++
+[S] -> T; S++
+-----------
+CHECK L_ZERO --> WRITE
+T -> W;
+
+loop: 
+	SETW0ASCARRYFLAG
+	W -> T
+	U -> W
+	WROR + SETW0ASCARRYFLAG
+	W -> U
+	T -> W
+	UCF
+	WROR
+	check LZERO --> write_pre, else loop
+
+write_pre:
+		W -> T
+write:
+	U -> [D]; D++
+	T -> [D]; D++
+	
+	
+	
+

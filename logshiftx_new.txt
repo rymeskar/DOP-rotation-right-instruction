@@ -1,0 +1,82 @@
+;prvne rozvist na co nejdelsi, odeslat na git
+init2:		OES OEAB,		0,	0,		; adresace pameti
+READ_L2:	{
+		OES OEAB MRD ECINL,	0,	10,	READ_L2	; nacteme nizsi slabiku
+		ECS,			0,	0,		; zvysime ukazatel na pamet
+		}
+		OES OEAB,		0,	0,		; adresace pameti
+READ_H2:	{
+		OES OEAB MRD ECINH,	0,	10,	READ_H2	; nacetem vyssi slabiku
+		OEINLH PEU,			0,	0,		; zapis do registru U - nizsi
+		}
+		ECS,						; zvysime ukazatel na pamet
+;**********************************************************************************
+init3:		OES OEAB,		0,	0,		; adresace pameti
+READ_L3:	{
+		OES OEAB MRD ECINL,	0,	10,	READ_L3	; nacteme nizsi slabiku
+		ECS,			0,	0,		; zvysime ukazatel na pamet
+		}
+		OES OEAB,		0,	0,		; adresace pameti
+READ_H3:	{
+		OES OEAB MRD ECINH,	0,	10,	READ_H3	; nacetem vyssi slabiku
+		OEINLH PET,		0,	0,		; zapis do registru U - nizsi
+		}
+		ECS,						; zvysime ukazatel na pamet
+;**********************************************************************************
+
+		, 0, 14 ; CHECK_ZERO_L
+CHECK_ZERO_L: {
+		OET ECW	, 2 , 0 ; nacteni T -> W, pokud neni nula
+				, 0	, 0 , write;  pokud je nula, ihned zapis zpet do pameti 
+		}
+
+one_shift: 
+			CFS1 ECF,	7,  0,		; setne nejnizsi bit vyssiho slova jako carry flag
+			OEW  PET,   0,  0,  	;  vrati T nazpet
+;**********************************************************************************
+lo_right:	OEU ECW,	2,	0,		; nacte U -> W
+				UCF,    0,  0,      ; zero mode kvuli double wordu, dá se sloučit s předchozí instrukcí
+		ECF ECW CFS1,		1,	0,	; posuv o 1 vpravo za pomoci carry z predesle ALU operace a opet setne nejnizsi bit
+		OEW PEU,		0,	0,		; zapis w -> U
+;**********************************************************************************
+hi_right:OET ECW,		2,	0,		; nacte T -> W
+		ECF ECW,		1,	0,		; posuv o 1 vpravo za pomoci carry z predesle ALU operace
+;**********************************************************************************
+		ECL,			0,	0,		; L--
+		,			0,	14,		; loop
+loop:		{
+			 ,			0,	0,	one_shift	; L neni nulove
+	OEW PET  ,			0,	0,	write	; L je nula, zapisu w -> T
+		}
+;**********************************************************************************
+write:		OEU ECOUTWR,		0,	0,		; U->DOUT
+
+		OED OEAB,		0,	0,		; adresace pameti
+wr_lo:		{
+		OED OEAB MWR OEWR, 	0,	10,	wr_lo	; zapis dat do pameti lo
+		OED OEAB OEWR ECD,	0,	0,		; presah
+		}
+
+		OED OEAB, 		0,	0,		; adresace pameti
+wr_hi:		{
+		OED OEAB MWR OEWR LH,	0,	10, 	wr_hi	; zapis dat do pameti hi
+		OED OEAB ECD OEWR LH,   0,	0, 		;
+		}
+;**********************************************************************************
+write2:		OET ECOUTWR,		0,	0,		; T->DOUT
+
+		OED OEAB,		0,	0,		; adresace pameti
+wr_lo2:		{
+		OED OEAB MWR OEWR, 	0,	10,	wr_lo2	; zapis dat do pameti lo
+		OED OEAB OEWR,		0,	0,		; presah
+		}
+		ECD,			0,	0,		;
+
+		OED OEAB, 		0,	0,		; adresace pameti
+wr_hi2:		{
+		OED OEAB MWR OEWR LH,	0,	10, 	wr_hi2	; zapis dat do pameti hi
+		OED OEAB OEWR LH,   0,	0, 		;
+		}
+		ECD,			0,	0,	;
+;**********************************************************************************
+end:		,			0,	0,	init1	; again
