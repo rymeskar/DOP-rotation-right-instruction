@@ -7,9 +7,9 @@ READ_L2:	{
 		OES OEAB,		0,	0,		; adresace pameti
 READ_H2:	{
 		OES OEAB MRD ECINH,	0,	10,	READ_H2	; nacetem vyssi slabiku
-		OEINLH PEU,			0,	0,		; zapis do registru U - nizsi
+		OEINLH PEU ECS,			0,	0,		; zapis do registru U - nizsi a zvysime ukazatel na pamet
 		}
-		ECS,						; zvysime ukazatel na pamet
+		
 ;**********************************************************************************
 init3:		OES OEAB,		0,	0,		; adresace pameti
 READ_L3:	{
@@ -32,16 +32,16 @@ CHECK_ZERO_L: {
 pre_shift:
 		CFS1 ECF,	7,  0,		; setne nejnizsi bit vyssiho slova jako carry flag
 one_shift: 
-			OEW  PET,   0,  0,  	;  vrati T nazpet
+		OEW  PET,   0,  0,  	;  vrati T nazpet
 ;**********************************************************************************
-lo_right:	OEU ECW,	2,	0,		; nacte U -> W
+lo_right:	 OEU ECW,	2,	0,		; nacte U -> W
 		ECF ECW CFS1,		1,	0,	; posuv o 1 vpravo za pomoci carry z predesle ALU operace a opet setne nejnizsi bit
-		OEW PEU,		0,	0,		; zapis w -> U
+		OEW PEU     ,		0,	0,	; zapis w -> U
 ;**********************************************************************************
 hi_right: OET ECW UCF,		2,	0,		; nacte T -> W, zero mode kvuli double wordu, dá se použít v dalši mikroinstrukci
-		ECF ECW,		1,	0,		; posuv o 1 vpravo za pomoci carry z predesle ALU operace
+		ECF ECW     ,		1,	0,		; posuv o 1 vpravo za pomoci carry z predesle ALU operace
 ;**********************************************************************************
-		ECL,			0,	0,		; L--
+		ECL        ,		0,	0,		; L--
 		,			0,	14,		; loop
 loop:		{
 		CFS1 ECF,	7,	0,	one_shift	; L neni nulove, rovnou setnu nejnizsi bit vyssiho slova jako carry flag 
@@ -67,15 +67,14 @@ write2:		OET ECOUTWR,		0,	0,		; T->DOUT
 		OED OEAB,		0,	0,		; adresace pameti
 wr_lo2:		{
 		OED OEAB MWR OEWR, 	0,	10,	wr_lo2	; zapis dat do pameti lo
-		OED OEAB OEWR,		0,	0,		; presah
+		OED OEAB OEWR ECD,		0,	0,		; presah
 		}
-		ECD,			0,	0,		;
 
 		OED OEAB, 		0,	0,		; adresace pameti
 wr_hi2:		{
 		OED OEAB MWR OEWR LH,	0,	10, 	wr_hi2	; zapis dat do pameti hi
-		OED OEAB OEWR LH,   0,	0, 		;
+		OED OEAB OEWR LH ECD,   0,	0, 		;
 		}
-		ECD,			0,	0,	;
+		
 ;**********************************************************************************
 end:		,			0,	0,	init1	; again
