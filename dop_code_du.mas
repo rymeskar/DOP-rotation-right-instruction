@@ -693,6 +693,7 @@ SW_INTW2:	{
 ;uložené v registru S vpravo o počet pozic, který je dán hodnotou registru L. Výsledek 
 ;uložte do paměti na adresu určenou v registru D. Nastavte příznaky
 ;-------------------------------------------
+;prvne rozvist na co nejdelsi, odeslat na git
 SHIFT_LEFT_ROTATE:	{
 		OES OEAB MRD ECINL,	0,	10,	SHIFT_LEFT_ROTATE	; nacteme nizsi slabiku
 		ECS,			0,	0,		; zvysime ukazatel na pamet
@@ -716,36 +717,33 @@ READ_H3:	{
 		}
 		
 		ECS, 0, 14 ; CHECK_ZERO_L	zvysime ukazatel na pamet a rovnou testujem zero flag
-		
 ;**********************************************************************************
 
 CHECK_ZERO_L: {
-		OET ECW	, 2 , 0 , pre_shift     ; nacteni T -> W, pokud neni nula
-				, 0	, 0 , write;  pokud je nula, ihned zapis zpet do pameti 
+		OEU ECW	, 2 , 0 , pre_shift     ; nacteni U -> W, pokud neni nula 
+				, 0	, 0 , write;  pokud je nula, ihned zapis zpet do pameti //dodelat flag setting
 		}
-
+		
 pre_shift: CFS1 ECF,	7,  0,		; setne nejnizsi bit vyssiho slova jako carry flag
 
-one_shift: OEW  PET,   0,  0,  	;  vrati T nazpet
-		
+one_shift: OEW  PEU,   0,  0,  	;  vrati U nazpet
 ;**********************************************************************************
-lo_right:	 OEU ECW,	2,	0,		; nacte U -> W
+lo_right:	 OET ECW,	2,	0,		; nacte T -> W
 		ECF ECW CFS1,		1,	0,	; posuv o 1 vpravo za pomoci carry z predesle ALU operace a opet setne nejnizsi bit
-		OEW PEU     ,		0,	0,	; zapis w -> U
-		
+		OEW PET     ,		0,	0,	; zapis w -> T
 ;**********************************************************************************
-hi_right: OET ECW UCF,		2,	0,		; nacte T -> W, zero mode kvuli double wordu, dá se použít v dalši mikroinstrukci
+hi_right: OEU ECW	,		2,	0,		; nacte U -> W
 		ECF ECW     ,		1,	0,		; posuv o 1 vpravo za pomoci carry z predesle ALU operace
-		
 ;**********************************************************************************
 		ECL        ,		0,	0,		; L--
 		,			0,	14,		; loop
 loop:		{
 		CFS1 ECF,	7,	0,	one_shift	; L neni nulove, rovnou setnu nejnizsi bit vyssiho slova jako carry flag 
-		OEW PET  ,			0,	0,	write	; L je nula, zapisu w -> T
+		OEW PEU  UCF,			0,	0,	check_higher	; L je nula, zapisu w -> U A pripravim cumulative zero mode
 		}
-		
 ;**********************************************************************************
+
+check_higher: OET ECW  ECF, 		2,  0,  	; T -> W a rovnou setnout flagy 
 
 write:		OEU ECOUTWR,		0,	0,		; U->DOUT
 
@@ -760,9 +758,7 @@ wr_hi:		{
 		OED OEAB MWR OEWR LH,	0,	10, 	wr_hi	; zapis dat do pameti hi
 		OED OEAB ECD OEWR LH,   0,	0, 		;
 		}
-		
 ;**********************************************************************************
-
 write2:		OET ECOUTWR,		0,	0,		; T->DOUT
 
 		OED OEAB,		0,	0,		; adresace pameti
@@ -774,5 +770,7 @@ wr_lo2:		{
 		OED OEAB, 		0,	0,		; adresace pameti
 wr_hi2:		{
 		OED OEAB MWR OEWR LH,	0,	10, 	wr_hi2	; zapis dat do pameti hi
-		OED OEAB OEWR LH ECD,   0,	0, 		;
+		OED OEAB OEWR LH ECD,   0,	0, 	INTCHECK	;
 		}
+		
+;**********************************************************************************
