@@ -26,7 +26,7 @@ READ_H3:	{
 
 		, 0, 14 ; CHECK_ZERO_L
 CHECK_ZERO_L: {
-		OET ECW	, 2 , 0 ; nacteni T -> W, pokud neni nula
+		OET ECW	, 2 , 0 , one_shift  ; nacteni T -> W, pokud neni nula
 				, 0	, 0 , write;  pokud je nula, ihned zapis zpet do pameti 
 		}
 
@@ -35,11 +35,11 @@ one_shift:
 			OEW  PET,   0,  0,  	;  vrati T nazpet
 ;**********************************************************************************
 lo_right:	OEU ECW,	2,	0,		; nacte U -> W
-				UCF,    0,  0,      ; zero mode kvuli double wordu, dá se sloučit s předchozí instrukcí
 		ECF ECW CFS1,		1,	0,	; posuv o 1 vpravo za pomoci carry z predesle ALU operace a opet setne nejnizsi bit
 		OEW PEU,		0,	0,		; zapis w -> U
 ;**********************************************************************************
 hi_right:OET ECW,		2,	0,		; nacte T -> W
+		UCF,    0,  0,      ; zero mode kvuli double wordu, dá se sloučit s předchozí instrukcí
 		ECF ECW,		1,	0,		; posuv o 1 vpravo za pomoci carry z predesle ALU operace
 ;**********************************************************************************
 		ECL,			0,	0,		; L--
