@@ -1,0 +1,689 @@
+;*******************************************************************************************************
+;   P A M E T    M I K R O I N S T R U K C I    mikroprocesoru    D O P - v3 
+;---------------------------------------------------------------------------
+;
+;   datum posledni upravy : 2.9. 2003 
+;   autor	          : MPR (Michal Prazan), MBE (Milos Becvar)
+;   cislo revize	  : 3.0	
+;   historie		  : 2.1 - inicialni revize pro ZS 2001
+;			    2.2 - opravena instrukce RRC a RLC (nastaveni CFS)
+;			    3.0 - pomerne radikalni uprava firmware pro DOP-v3 
+;*******************************************************************************************************
+
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+;   N A S T A V E N I   P O   Z A P N U T I , T E S T    V N E J S I H O    P R E R U S E N I
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+
+START:	,0,0, INTCHECK			; Nastaveni po zapnuti/resetu (momentalne prazdna operace)
+
+INTCHECK:	,0,27, IFT			; Test IF
+
+IFT:		{
+		,0,0,  FETCH			; IF=0 => FETCH
+		,0,26, HW_INT_TEST		; IF=1 => Test signalu INT 
+     		}
+
+HW_INT_TEST: 	{
+		,0,0, FETCH			; INT=0 => FETCH
+		 INTA ECIR, 0, 26, INTVECT 	; INT=1 => INTA, cekani na prerusovaci vektor
+		}
+		
+INTVECT:	{
+		,0,0, SW_INT			; INT=0 => Prerusovaci vektor nacten, jdi na obsluhu
+		INTA ECIR,0, 26, INTVECT	; INT=1 => INTA, cekani na prerusovaci vektor
+		}
+
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+;   N A C T E N I    N O V E    I N S T R U K C E
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+
+FETCH:		OEPC OEAB , 0 , 0 ,		;
+		
+FMWAIT: 	{
+		OEPC MRD ECIR OEAB , 0 , 10 , FMWAIT	; Cekani na pamet
+	 	ECPC     , 0 , 1  , DECODE     ; test IR(7:5) - prvni rozeskoceni podle nejvyssich bitu
+		}
+
+
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+;   D E K O D O V A N I    I N S T R U K C E
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+
+DECODE:		{
+		, 0 , 5 , DEC_000	; IR(7:5)=000 LD1, LD2 - test IR(1:0)
+		, 0 , 5 , DEC_001	; IR(7:5)=001 OP1, OP2 - test IR(1:0)
+		, 0 , 5 , DEC_010	; IR(7:5)=010 OP1, OP2 - test IR(1:0)
+		, 0 , 5 , DEC_011	; IR(7:5)=011 OP1, OP2 - test IR(1:0) 
+		, 0 , 3 , DEC_100	; IR(7:5)=100 ST, RLC, RRC, NOT, SHR, SCF, JSW, test IR(4:2)
+		, 0 , 4 , DEC_101	; IR(7:5)=101 LD3, LD4, LD5, LD6, SWW, UCF, JSR, RET, RETI test IR(3:1)
+		, 0 , 9 , JP_DEC	; IR(7:5)=110 JP nebo nedef. test IR(4)
+		, 0 , 9 , IT_DEC	; IR(7:5)=111 IT nebo nedef. test IR(4)
+		}
+
+;-------------------------------------------------------------------------------------------------------
+; DRUHA UROVEN DEKODOVANI, NEKTERE INSTRUKCE REALIZOVANY JIZ V TOMTO TAKTU
+;-------------------------------------------------------------------------------------------------------
+
+DEC_000:	{
+		, 0 , 3	, LD2		; IR=000xxx00 LD2 / nop - test IR(4:2)
+		, 0 , 6 , OPLD1		; IR=000xxx01 LD1 short - test IR(3:2) (zdroj)
+		, 0 , 6 , OPLD1		; IR=000xxx10 LD1 word - test IR(3:2) (zdroj)
+		, 0 , 6 , OPLD1		; IR=000xxx11 LD1 byte - test IR(3:2) (zdroj)
+		}
+
+
+DEC_001:	{
+		, 0 , 3, OP2_01		; IR=001xxx00 OP2 - test IR(4:2)
+		, 0 , 6, OPLD1		; IR=001xxx01 OP1 short - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=001xxx10 OP1 word - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=001xxx11 OP1 byte - test IR(3:2) zdroj
+		}
+
+DEC_010:	{
+		, 0 , 3, OP2_10		; IR=010xxx00 OP2 - test IR(4:2)
+		, 0 , 6, OPLD1		; IR=010xxx01 OP1 short - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=010xxx10 OP1 word - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=010xxx11 OP1 byte - test IR(3:2) zdroj
+		}
+
+DEC_011:	{
+		, 0 , 3, OP2_11		; IR=011xxx00 OP2 - test IR(4:2)
+		, 0 , 6, OPLD1		; IR=011xxx01 OP1 short - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=011xxx10 OP1 word - test IR(3:2) zdroj
+		, 0 , 6, OPLD1		; IR=011xxx11 OP1 byte - test IR(3:2) zdroj
+		}
+
+
+DEC_100:	{
+		OEW ECOUTWR	, 0 , 5 , cil		; IR=100000xx	ST W test IR(1:0) cil
+		OEPSW ECOUTWR 	, 0 , 5 , cil		; IR=100001xx	ST PSW test IR(1:0) cil
+		OES ECOUTWR   	, 0 , 5 , cil		; IR=100010xx	ST S test IR(1:0) cil
+		OED ECOUTWR   	, 0 , 5 , cil		; IR=100011xx	ST D test IR(1:0) cil
+				, 0 , 5 , RRCJSW	; IR=100100xx	RRC,JSW nebo nedef. test IR(1:0)
+		ECF CFS0 	, 0 , 0 , INTCHECK	; IR=100101xx	instrukce SCF IR(1:0) neni dek.	
+				, 0 , 5 , RLCNOTSHR	; IR=100110xx   RLC,NOT,SHR nebo nedef. test IR(1:0)
+				, 0 , 0 , INTCHECK	; IR=100111xx   nedef.
+		}
+
+
+DEC_101:	{
+		SWW		, 0 , 0 , FETCH		; IR=101x000x	SWW (IR(4) a IR(0) nejsou dek.)
+				, 0 , 7 , JSRLD6PC	; IR=101x001x   JSR nebo LD6PC, test IR(4) IR(0)
+				, 0 , 7 , LD5S		; IR=101x010x	LD5 short	test IR(4) IR(0)
+				, 0 , 9 , LD6SPLD5WB	; IR=101x011x	LD6SP nebo LD5WB test IR(4) 
+				, 0 , 0 , INTCHECK	; IR=101x100x	nedef.
+		OEPC OEAB	, 0 , 0 , LD3		; IR=101x101x	LD3
+		UCF		, 0 , 0 , FETCH		; IR=101x110x	UCF (IR(4) a IR(0) nejsou dek.)
+				, 0 , 7 , RETLD4	; IR=101x111x	RET/RETI/LD4, test IR(4) IR(0)
+		}
+ 					
+JP_DEC:		{
+				, 0 , 0 , INTCHECK	; IR=1100xxxx nedef.
+				, 0 , 4 , JP_podm	; IR=1101xxxx JP
+		}
+
+IT_DEC:		{		
+				, 0 , 0 , INTCHECK	; IR=1110xxxx nedef.
+				, 0 , 0 , SW_INT	; IR=1111xxxx instr. IT = SW interrupt 
+		}
+
+;-------------------------------------------------------------------------------------------------------
+; TRETI UROVEN DEKODOVANI
+;-------------------------------------------------------------------------------------------------------
+
+OPLD1:		{
+		OEPC OEAB, 0 , 0, OPLD1_PC;
+		OESP OEAB, 0 , 0, OPLD1_SP;
+		OES  OEAB, 0 , 0, OPLD1_S;
+		OED  OEAB, 0 , 0, OPLD1_D;
+		} 
+
+RRCJSW:		{
+		ECW CFS1 ECF, 1 , 0 , INTCHECK		; IR=10010000	instrukce RRC
+			    , 0 , 0 , INTCHECK		; IR=10010001	nedef.		
+			    , 0 , 0 , INTCHECK		; IR=10010010 	nedef.
+		OEPC ECOUTWR ECSP, 0 , 0 , JSW		; IR=10010011	realizace instrukce JSW
+		}
+
+RLCNOTSHR:	{
+				, 0 , 18 , RLC		; IR=10011000 instrukce RLC (musime testovat CF)
+		OEW ECF ECW 	, 3 , 0 , INTCHECK	; IR=10011001 not(W)->W		
+		ECF		, 15, 0 , SHR 		; IR=10011010 SHR prvni krok (nastaveni CF dle znamenka) 
+				, 0 , 0 , INTCHECK	; IR=10011011 nedef.	
+		}
+
+
+JSRLD6PC:	{
+		OEPC OEAB, 0 , 0 , JSRW1 	; IR=10100010	JSR
+		, 0 , 0 , INTCHECK	 	; IR=10100011  nedef.
+		OEPC OEAB, 0 , 0 , LD6PCW1 	; IR=10110010	LD6PC WORD
+		OEPC OEAB, 0 , 0 , LD6PCB1 	; IR=10110011	LD6PC BYTE
+		}
+
+
+RETLD4:		{
+			, 0 , 0 , INTCHECK ; IR=10101110 nedef.
+		OEPC OEAB, 0 , 0 , LD3	   ; IR=10101111 LD4 (sdili zacatek s LD3)
+		OESP OEAB, 0 , 0 , RETW1   ; IR=10111110 RET 
+		OESP OEAB, 0 , 0 , RETW1   ; IR=10111111 RETI (sdili zacatek s RET)
+		}
+
+LD5S:		{
+			 , 0 , 0 , INTCHECK ; IR=10100100 nedef.
+		OEW OEAB , 0 , 0 , LD5W1    ; IR=10100101 LD5 SHORT
+			 , 0 , 0 , INTCHECK ; IR=10110100 nedef.
+			 , 0 , 0 , INTCHECK ; IR=10110101 nedef.
+		}
+
+LD6SPLD5WB:	{
+		OEW OEAB , 0 , 0 , LD5W1    ; IR=1010011X LD5 WORD/BYTE
+		OESP OEAB, 0 , 0 , LD6SP    ; IR=1011011X LD6 SP WORD/BYTE
+		}		
+
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+;   R E A L I Z A C E    J E D N O T L I V Y C H    I N S T R U K C I 
+;-------------------------------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------------------------------
+
+;------------------------------------------
+; Dokonceni "KRATKYCH" instrukci RLC a SHR 
+;------------------------------------------
+		 
+RLC:		{
+		ECF ECW    , 15 , 0 , INTCHECK	; RLC pro CF=0
+		ECF ECW CI0, 15 , 0 , INTCHECK  ; RLC pro CF=1
+		}
+
+SHR:		ECW CFS1 ECF, 1 , 0 , INTCHECK ; dokonceni SHR CF<-W(0), W(15)<-CF, W(14:0)<-W(15:1)
+
+
+
+
+;------------------------------------------
+; KOMPLETNI REALIZACE INSTRUKCE ST
+;------------------------------------------
+
+; volba cilove adresy + typ cile
+
+cil:		{
+		ECSP , 0 , 0 , SPW		; odskok na spw (cil (word) na adresu v SP)
+		ECSP , 0 , 0 , SPB		; odskok na spb (cil (byte) na adresu v SP)
+		OED OEAB , 0 , 0 , DW		; odskok na dw (cil (word) na adresu v D)
+		OED OEAB , 0 , 0 , DB		; odskok na db (cil (byte) na adresu v D)
+		}
+		
+; vlastni realizace instrukce ST
+;----------------------------------
+
+DW:		{
+		OED OEAB MWR OEWR , 0 , 10 , DW ;   - realizace instrukce ST (cil (word) na adresu v D)
+		OED OEAB OEWR ECD , 0 , 0 ,			;
+		}
+
+		OED OEAB OEWR LH , 0 , 0 ,		  ;
+
+DW2:		{
+		OED OEAB MWR OEWR LH , 0 , 10 , DW2; druha slabika
+		OED OEAB ECD OEWR LH , 0 , 0 , INTCHECK		  ;
+		}
+
+DB:		{
+		OED OEAB MWR OEWR , 0 , 10 , DB ;   - realizace instrukce ST (cil (byte) na adresu v D)
+		OED OEAB OEWR ECD , 0 , 0 , INTCHECK		;
+		}
+
+SPW:		OESP OEAB OEWR LH, 0 , 0 ,		;   - realizace instrukce ST (cil (word) na adresu v SP)
+
+SPW1:		{
+		OESP OEAB MWR OEWR , 0 , 10 , SPW1; 
+		OESP OEAB ECSP OEWR , 0 , 0 ,			;
+		}
+
+		OESP OEAB OEWR LH, 0 , 0 ,		;
+
+SPW2:		{
+		OESP OEAB MWR OEWR LH, 0 , 10 , SPW2; druha slabika
+		OESP OEAB OEWR LH, 0 , 0 , INTCHECK;
+		}
+
+SPB:		OESP OEAB OEWR LH, 0 , 0 ,		;   - realizace instrukce ST (cil (byte) na adresu v SP)
+
+SPB1:		{
+		OESP OEAB MWR OEWR , 0 , 10 , SPB1;
+		OESP OEAB OEWR, 0 , 0 , INTCHECK;
+		}
+
+
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE JSW
+;----------------------------------
+JSW:		OEW PEPC , 0 , 0 , SPW	;
+;------------------------------------------------
+
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE JSR
+;----------------------------------
+
+JSRW1:		{
+		OEPC OEAB MRD ECINL, 0 , 10 , JSRW1 ;
+		ECPC , 0 , 0 ,				;
+		}
+
+		OEPC OEAB ECSP , 0 , 0 ,	;
+
+JSRW2:		{
+		OEPC OEAB MRD ECINH, 0 , 10 , JSRW2;
+		ECPC , 0 , 0 ,				;
+		}
+
+		OEPC ECOUTWR , 0 , 0 ,		; ulozeni stareho PC
+		OEINLH PEPC , 0 , 0 ,	SPW	; RETADR = SPW
+
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE LD5
+;----------------------------------
+
+LD5W1:	{
+	OEW OEAB MRD ECINL , 0 , 10 , LD5W1; 
+		ECW CI0, 8 , 5 , LD5_DC                ; dekodovani IR1 IR0
+	}
+
+LD5_DC:		{
+		, 0 , 0 , INTCHECK		; redundantni, sem se to nikdy nedostane
+		OEINSE ECW , 2 , 0 , INTCHECK	; 
+		OEW OEAB , 0 , 0 , LD5W2	;
+		OEINZE ECW , 2 , 0 , INTCHECK	;
+		}
+
+
+LD5W2:	{
+	OEW OEAB MRD ECINH , 0 , 10 , LD5W2;
+		OEINLH ECW , 2 , 0 , INTCHECK	;
+	}
+
+;-----------------------------------------------
+; REALIZACE INSTRUKCE LD3 (LD4)
+;----------------------------------
+
+LD3:	{
+	OEPC OEAB MRD ECINL , 0 , 10 , LD3;
+	OESP ECW ECPC , 2 , 12 , LD3DC	; Test IR(2) - LD3 nebo LD4
+	}
+
+LD3DC:		{
+		OEINZE ECW CI0, 11 , 9 , LD3CIL		; SP-W->W test  IR(4)
+		OEINZE ECW CI0, 11 , 0 , INTCHECK	; SP-W->W konec instrukce LD4
+		}
+
+
+LD3CIL:		{
+		OEW PES , 0 , 0 , INTCHECK		; LLA S
+		OEW PED , 0 , 0 , INTCHECK		; LLA D
+		}
+
+
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE LD6
+;----------------------------------
+; zdroj SP
+
+LD6SP:		{
+		OESP OEAB MRD ECINH ECINL, 0 , 10 , LD6SP; 
+		UDSP ECSP , 0 , 11 , testw ; dekodovani IR(0)
+		}
+
+
+testw:	        {
+                OESP OEAB , 0 , 0 , LD6SPW2	; (dale word)		
+		OEINZE PEL , 0 , 0 , INTCHECK	; (byte)
+		}
+
+
+LD6SPW2:	{
+		OESP OEAB MRD ECINL , 0 , 10 , LD6SPW2;
+		OEINLH PEF PEL UDSP ECSP , 0 , 0 , INTCHECK	;
+		}
+
+; zdroj PC (byte)
+
+LD6PCB1:	{
+		OEPC OEAB MRD ECINL  , 0 , 10 , LD6PCB1;
+		OEINZE PEL ECPC, 0 , 0 , INTCHECK	;
+		}
+
+; zdroj PC (word)
+
+
+LD6PCW1:    	{
+		OEPC OEAB MRD ECINL  , 0 , 10 , LD6PCW1;
+		ECPC , 0 , 0 ,		;
+		}
+
+		OEPC OEAB , 0 , 0 ,		;
+
+LD6PCW2:	{
+		OEPC OEAB MRD ECINH , 0 , 10 , LD6PCW2;
+		ECPC OEINLH PEF PEL , 0 , 0 , INTCHECK	;
+		}
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE RET
+;----------------------------------
+
+
+RETW1:		{
+		OESP OEAB MRD ECINH , 0 , 10 , RETW1;
+		UDSP ECSP , 0 , 0 , ;
+		}
+		
+		OESP OEAB , 0 , 0 ,		;
+	
+RETW2:		{
+		OESP OEAB MRD ECINL , 0 , 10 , RETW2;
+		UDSP ECSP OEINLH PEPC , 0 , 11 , P3_11; dekodovani IR0 (RETI/RET)
+		}
+
+
+P3_11:	        {
+				, 0 , 0 , INTCHECK	; instrukce RET 
+		OESP OEAB	, 0 , 0 , RETIW1	; instrukce RETI
+		}
+
+
+;------------------------------------------------
+; REALIZACE INSTRUKCE RETI
+;----------------------------------
+
+
+RETIW1:		{
+		OESP OEAB MRD ECINH , 0 , 10 , RETIW1;
+		UDSP ECSP , 0 , 0 , ;
+		}
+
+		OESP OEAB , 0 , 0 ,		;
+
+RETIW2:		{
+		OESP OEAB MRD ECINL , 0 , 10 , RETIW2;
+		UDSP ECSP OEINLH PEF PEL , 0 , 0 , INTCHECK; DI -> PSW
+		}
+
+;=======================================================================================================
+; KOMPLETNI REALIZACE INSTRUKCE LD1 a OP1
+;-----------------------------------------
+
+;zdroj PC
+;-----------------------------------------------------------------------------------
+
+OPLD1_PC:	{
+		OEPC OEAB MRD ECINL , 0 , 10, OPLD1_PC;
+		ECPC , 0 , 5 , OPLD1_PC_DE 		    ; dekodovani IR1 IR0
+		}
+
+OPLD1_PC_DE:	{
+		, 0 , 0 , INTCHECK		; nedef. sem se to nedostane
+		, 0 , 2 , OPLD1_s		; dekodovani IR6 IR5 IR4 - znamenkove rozsireni
+		OEPC OEAB , 0 , 0 , OPLD1_PCW2	; dalsi slabika (word)
+		, 0 , 2 , OPLD1_b		; dekodovani IR6 IR5 IR4 - nulove rozsireni
+		}		
+
+
+OPLD1_PCW2:	{
+		OEPC OEAB MRD ECINH , 0 , 10 , OPLD1_PCW2 ;
+		ECPC , 0 , 2 , OPLD1_w	; dekodovani IR6 IR5 IR4
+		}
+
+;zdroj SP
+;-----------------------------------------------------------------------------------
+
+OPLD1_SP:	{
+		OESP OEAB MRD ECINL ECINH , 0 , 10 , OPLD1_SP ;
+		UDSP ECSP , 0 , 5 ,		; dekodovani IR1 IR0
+		}
+
+OPLD1_SPD:	{
+		, 0 , 0 , INTCHECK		; nedef. sem se to nedostane
+		, 0 , 2 , OPLD1_s		; dekodovani IR6 IR5 IR4 - znamenkove rozsireni
+		OESP OEAB , 0 , 0 , OPLD1_SPW2	; 
+		, 0 , 2 , OPLD1_b		; dekodovani IR6 IR5 IR4 - nulove rozsireni
+		}
+		
+OPLD1_SPW2:	{
+		OESP OEAB MRD ECINL , 0 , 10 , OPLD1_SPW2 ;
+		UDSP ECSP , 0 , 2 , OPLD1_w; dekodovani IR6 IR5 IR4
+		}
+
+;zdroj S
+;-----------------------------------------------------------------------------------
+
+
+OPLD1_S:	{
+		OES OEAB MRD ECINL , 0 , 10 , OPLD1_S;
+		ECS , 0 , 5 ,; dekodovani IR1 IR0
+		}
+
+OPLD1_SD:	{
+		, 0 , 0 , INTCHECK		; nedef. sem se to nedostane
+		, 0 , 2 , OPLD1_s		; dekodovani IR6 IR5 IR4 - znamenkove rozsireni
+		OES OEAB , 0 , 0 , OPLD1_SW2	; word - dalsi slabiku
+		, 0 , 2 , OPLD1_b		; dekodovani IR6 IR5 IR4 - nulove rozsireni
+		}
+
+
+
+OPLD1_SW2:	{
+		OES OEAB MRD ECINH , 0 , 10 , OPLD1_SW2 ; 
+		ECS , 0 , 2 , OPLD1_w; dekodovani IR6 IR5 IR4
+		}
+
+;zdroj D
+;-----------------------------------------------------------------------------------
+
+
+OPLD1_D:	{
+		OED OEAB MRD ECINL , 0 , 10 , OPLD1_D ;
+		, 0 , 5 , OPLD1_DC	; dekodovani IR1 IR0
+		}
+
+OPLD1_DC:	{
+		, 0 , 0 , INTCHECK		; nedef. sem se to nedostane
+		, 0 , 2 , OPLD1_s		; dekodovani IR6 IR5 IR4 - znamenkove rozsireni
+		ECD , 0 , 0 , OPLD1_D_w		; dekodovani IR6 IR5 IR4
+		, 0 , 2 , OPLD1_b		; dekodovani IR6 IR5 IR4 - nulove rozsireni
+		}
+
+OPLD1_D_w:	OED OEAB , 0 , 0 ,		;
+
+OPLD1_DW2:	{
+		OED OEAB MRD ECINH , 0 , 10 , OPLD1_DW2 ;
+		UDD ECD , 0 , 2 , OPLD1_w; dekodovani IR6 IR5 IR4
+		}
+
+;-----------------------------------------------------------------------------------
+; (short, sign) znamenkove rozsireni
+OPLD1_s:	{
+		OEINSE PES , 0 , 0 , INTCHECK	; => S
+		OEINSE PED , 0 , 0 , INTCHECK	; => D
+		OEINSE ECF ECW , 10 , 0 , INTCHECK	; operace +
+		OEINSE ECF ECW CI0, 11 , 0 , INTCHECK	; operace -
+		OEINSE ECF ECW , 4 , 0 , INTCHECK	; operace AND
+		OEINSE ECF ECW , 5 , 0 , INTCHECK	; operace OR
+		OEINSE ECF ECW , 6 , 0 , INTCHECK	; operace XOR
+		OEINSE ECW     , 2 , 0 , INTCHECK	; => W	(not setting Flags !)
+		}		
+
+; word
+OPLD1_w:	{
+		OEINLH PES , 0 , 0 , INTCHECK	; => S
+		OEINLH PED , 0 , 0 , INTCHECK	; => D
+		OEINLH ECF ECW , 10 , 0 , INTCHECK	; operace +
+		OEINLH ECF ECW CI0, 11 , 0 , INTCHECK	; operace -
+		OEINLH ECF ECW , 4 , 0 , INTCHECK	; operace AND
+		OEINLH ECF ECW , 5 , 0 , INTCHECK	; operace OR
+		OEINLH ECF ECW , 6 , 0 , INTCHECK	; operace XOR
+		OEINLH ECW , 2 , 0 , INTCHECK	; => W (not setting Flags !)
+		}
+
+; (byte) nulove rozsireni
+OPLD1_b:	{
+		OEINZE PES , 0 , 0 , INTCHECK	; => S
+		OEINZE PED , 0 , 0 , INTCHECK	; => D
+		OEINZE ECF ECW , 10 , 0 , INTCHECK	; operace +
+		OEINZE ECF ECW CI0, 11 , 0 , INTCHECK	; operace -
+		OEINZE ECF ECW , 4 , 0 , INTCHECK	; operace AND
+		OEINZE ECF ECW , 5 , 0 , INTCHECK	; operace OR
+		OEINZE ECF ECW , 6 , 0 , INTCHECK	; operace XOR
+		OEINZE ECW , 2 , 0 , INTCHECK	; => W (not setting Flags !)
+		}
+
+
+
+;-----------------------------------------------------------------------------------
+; KOMPLETNI REALIZACE INSTRUKCE LD2
+;-----------------------------------
+
+LD2:		{
+			 , 0 , 0 , INTCHECK	; nedef.  IR=00000000 
+			 , 0 , 0 , INTCHECK	; nedef.  IR=00000100
+			 , 0 , 0 , INTCHECK	; nedef.  IR=00001000
+			 , 0 , 0 , INTCHECK	; nedef.  IR=00001100
+		OEW PEPC , 0 , 0 , INTCHECK	; W => PC IR=00010000
+		OEW PESP , 0 , 0 , INTCHECK	; W => SP IR=00010100
+		OEW PES  , 0 , 0 , INTCHECK	; W => S  IR=00011000
+		OEW PED  , 0 , 0 , INTCHECK	; W => D  IR=00011100
+		}
+
+
+
+;-----------------------------------------------------------------------------------
+; KOMPLETNI REALIZACE INSTRUKCE OP2
+;-----------------------------------
+
+
+
+; operace + , -
+OP2_01:		{
+		OEW ECW ECF , 10 , 0 , INTCHECK	; IR(4:2)=000 OP=010 W
+		OEAF ECW ECF , 10 , 0, INTCHECK ; IR(4:2)=001 OP=010 XAF
+		OES ECW ECF , 10 , 0 , INTCHECK	; IR(4:2)=010 OP=010 S
+		OED ECW ECF , 10 , 0 , INTCHECK	; IR(4:2)=011 OP=010 D
+		OEW ECW ECF CI0 , 11 , 0 , INTCHECK	; IR(4:2)=100 OP=011 W 	
+		OEAF ECW ECF CI0, 11 , 0, INTCHECK ; IR(4:2)=101 OP=011 XAF
+		OES ECW ECF CI0, 11 , 0 , INTCHECK	; IR(4:2)=110 OP=011 S	
+		OED ECW ECF CI0, 11 , 0 , INTCHECK	; IR(4:2)=111 OP=011 D
+		}
+
+
+; operace AND , OR
+OP2_10:		{
+		OEW ECW ECF , 4 , 0 , INTCHECK	; IR(4:2)=000 OP=100 W
+		OEAF ECW ECF , 4 , 0, INTCHECK  ; IR(4:2)=001 OP=100 XAF
+		OES ECW ECF , 4 , 0 , INTCHECK	; IR(4:2)=010 OP=100 S
+		OED ECW ECF , 4 , 0 , INTCHECK	; IR(4:2)=011 OP=100 D
+		OEW ECW ECF , 5 , 0 , INTCHECK	; IR(4:2)=100 OP=101 W 	
+		OEAF ECW ECF , 5 , 0, INTCHECK  ; IR(4:2)=101 OP=101 XAF
+		OES ECW ECF , 5 , 0 , INTCHECK	; IR(4:2)=110 OP=101 S	
+		OED ECW ECF , 5 , 0 , INTCHECK	; IR(4:2)=111 OP=101 D
+		}
+
+
+; operace XOR , MOVE
+OP2_11:		{
+		OEW ECW ECF , 6 , 0 , INTCHECK	; IR(4:2)=000 OP=110 W
+		OEAF ECW ECF, 6 , 0 , INTCHECK	; IR(4:2)=001 OP=110 XAF
+		OES ECW ECF, 6 , 0 , INTCHECK	; IR(4:2)=010 OP=110 S
+		OED ECW ECF, 6 , 0 , INTCHECK	; IR(4:2)=011 OP=110 D
+		, 0 , 0 , INTCHECK		; W->W = instrukce NOP
+		OESP ECW , 2 , 0 , INTCHECK	; SP -> W (zde opravdu neni XAF)
+		OES ECW , 2 , 0 , INTCHECK	; IR(4:2)=110 OP=111 S
+		OED ECW , 2 , 0 , INTCHECK	; IR(4:2)=111 OP=111 D
+		}
+
+
+;=======================================================================================================
+; KOMPLETNI REALIZACE INSTRUKCI JP a IT 
+;--------------------------------------
+; test IR(3:1) - typ podminky 
+;  vsechny priznaky testovany xor IR(0) => 0 ... priznak=IR(0)
+;					   1 ... priznak<>IR(0)
+
+JP_podm:	{ 
+		, 0 , 24 , test_flag		; JC, JNC
+		, 0 , 23 , test_flag		; JZ, JNZ
+		, 0 , 22 , test_flag		; JS, JNS
+		, 0 , 21 , test_flag		; JO, JNO
+		ECL , 0 , 0 , LZERO_POM		; DJNZ, DJZ (L musi byt napred dekrementovan) 
+		, 0 , 25 , test_flag		; JGE, JLT
+		, 0 , 0 , INTCHECK		; rezervovano
+		, 0 , 11 , jmp_test		; tato podminka je vzdy splnena, test IR(0) 
+		}
+
+LZERO_POM:	,0, 20, test_flag		; test LZERO
+
+test_flag:	{
+		OEPC OEAB, 0 , 0 , JP		; test splnen - skok na vykonnou cast JP
+		ECPC, 0 , 0 , nesplneno		; test nesplnen
+		}
+
+
+nesplneno:	ECPC , 0 , 0 , INTCHECK		; posledni inkrementace PC (nesplneny skok)
+
+
+jmp_test:	{
+		ECPC, 0 , 0 , nesplneno		; IR=11011110 , nikdy nesplneny skok
+		OEPC OEAB , 0 , 0 , JP		; IR=11011111 nepodmineny skok JMP
+	      }
+
+;---------------------------------------
+; VLASTNI VYKONNA CAST INSTRUKCE JP 
+;---------------------------------------
+
+
+
+JP:		{
+		OEPC OEAB MRD ECINL , 0 , 10 , JP;
+		ECPC , 0 , 0 ,;
+		}
+
+		OEPC OEAB , 0 , 0 ,		;
+
+JPW2:		{
+		OEPC OEAB MRD ECINH , 0 , 10 , JPW2	;
+		OEINLH PEPC , 0 , 0 , INTCHECK	;
+		}
+
+;--------------------------------------------
+; VLASTNI VYKONNA CAST INSTRUKCE IT
+; TEZ OBSLUHA HW PRERUSENI (DOP-v2 a novejsi)
+;--------------------------------------------
+
+
+SW_INT:	        OEPSW ECOUTWR ECSP , 0 , 0 , ; PSW -> DOUT SP++
+		OESP OEAB, 0 , 0 , ;
+
+SW_INTW1:	{
+		OESP OEAB OEWR MWR , 0 , 10 , SW_INTW1 ;
+		OESP ECSP OEWR , 0 , 0 , ; SP++
+		}
+
+
+		OESP OEAB OEWR LH, 0 , 0 ,  ;
+
+SW_INTW2:	{
+		OESP OEAB LH OEWR MWR , 0 , 10 , SW_INTW2 ;
+		OESP OEAB LH OEWR ECSP, 0 , 0 , ; SP++ 
+		}
+
+		OEINZE PEF, 0 , 0 ,  ; nulovani priznaku
+		OEPC ECOUTWR , 0 , 0 ,     ; PC -> DOUT
+		OEIT PEPC , 0 , 0 , SPW	   ; skok na zapis slova podle SP (drive RETADR)
