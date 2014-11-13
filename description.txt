@@ -17,21 +17,22 @@ obsah  adresy
 [S] -> T; S++
 -----------
 CHECK L_ZERO --> WRITE
-T -> W;
+U -> W;
 
 loop: 
 	SETW0ASCARRYFLAG
-	W -> T
-	U -> W
-	WROR + SETW0ASCARRYFLAG
 	W -> U
 	T -> W
+	WROR + SETW0ASCARRYFLAG
+	W -> T
+	U -> W
 	UCF
 	WROR
 	check LZERO --> write_pre, else loop
 
 write_pre:
-		W -> T
+		W -> U; UCF
+		T -> U; ECF
 write:
 	U -> [D]; D++
 	T -> [D]; D++
