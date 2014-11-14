@@ -2,10 +2,15 @@
 Posuňte cyklicky dvojité slovo uložené v paměti (způsobem "little-endian“) na adrese 
 uložené v registru S vpravo o počet pozic, který je dán hodnotou registru L. Výsledek 
 uložte do paměti na adresu určenou v registru D. Nastavte příznaky.
+Upřesnění specifikace: V případě, že v registru L je na začátku 0, neprovede se žádné protočení a rovnou se nastaví flagy. CF = 0, OV = 0 pokaždé. Registr L se na začátku "vymaskuje" s 00011111, aby neprobíhalo zbytečně moc operací.
+Chování:
+Pro posuv doprava je v ALU jednotce vyhrazena operace s op. znakem 1. Její provedení spočívá v posunutí všech 16 bitů doprava o 1 pozici, tudíž vysunutí LSB (dá se odchytit v CF),a nasunutí stávájícího CF na MSB. Tato operace se dá nádherně využit pro cyklický posuv vpravo, ale je třeba dbát na správné nastavování CF pro jednotlivé slova. Hodnota CF pro dané slovo a dané posunutí musí být vždy LSB druhého slova před posunutím. Tudíž v jednom cyklu je zapotřebí si nejdříve zjistit LSB např. horního slova, poté posunout dolní slovo s nasunutím zapamatovaného LSB z horního slova a zapamatovat si LSB dolního slova před posunutím, poté už jen stačí posunout horní slovo s nasunutím zapamatovaného LSB dolního slova. Tento cyklus se provádí, dokud není hodnota L == 0. Na konci se vyplatí stále držet v ALU dolní slovo, protože hned na začátku dalšího cyklu se budu ptát na jeho LSB. Tudíž ale před prvním provedení těla cyklu musím mít již v registru W  uloženo dolní slovo. A též po provedení posledního cyklu je nutné z ALU ještě načíst horní slovo do registrů v datové části! Ještě nastává jedna zrada, která je způsobená tím, že operace 1 je definována jako W shift right + CIN!. A pokud chceme správně nastavit flagy po operaci, musíme používat cummulative zero, čímž pádem nám přijde ale carry flag na cin. A v případě, že by se zrovna z nějákého slova zrovna vysouvala do CF 1, tak by se nám objevila jako CIN a výsledek by zneplatnial. Tudíž flagy se musí nastavit až po celém cyklu. Průchod cyklem jsem zoptimalizoval tak, že nejprve se posouvá horní slovo a teprve poté až dolní slovo, abych po cyklu už musel nastavovat flagy jen za horní slovo, protože v cummulative zero modu využiji flagy nastavené na konci cyklu. Horní slovo musí být vyhodnoceno jako druhé, aby proběhlo správné nastavení sign flagu. To je jediné místo, kde se nám promítne způsob uložení v paměti "little-endian". Všude jinde na něm nesejde.
+
 POPIS INSTRUKCE
+KOD INSTRUKCE: 10010001
 LITTLE ENDIAN!!!
 normal life: 3210
-obsah  adresy
+obsah  pamětová adresa
 ====
 | 0|  1000
 | 1|  1001
@@ -13,22 +18,34 @@ obsah  adresy
 | 2|  1002
 | 3|  1003
 ====
+Symbolický zápis:
+
 [S] -> U; S++
 [S] -> T; S++
+
 -----------
-CHECK L_ZERO --> WRITE
+CHECK L_ZERO
+{
+	true --> set_flags
+	false --> next adress
+}
+
 U -> W;
+SETW0ASCARRYFLAG;
 
 loop: 
-	SETW0ASCARRYFLAG
-	W -> U
-	T -> W
-	WROR + SETW0ASCARRYFLAG
-	W -> T
-	U -> W
-	UCF
-	WROR
-	check LZERO --> write_pre, else loop
+	W -> U;
+	T -> W;
+	WROR + SETW0ASCARRYFLAG;
+	W -> T;
+	U -> W;
+	WROR + ECF;
+	L--;
+	check LZERO 
+	{
+		true -->  write_pre; W -> U; + UCF
+		false --> loop; stav: SETW0ASCARRYFLAG;
+	}
 
 write_pre:
 		W -> U; UCF
@@ -36,7 +53,29 @@ write_pre:
 write:
 	U -> [D]; D++
 	T -> [D]; D++
+Kvantitativní ukazatele:
+	dekodování - 3 mikroinstrukce
+	natažení DWORDu z paměti - minimálně 12 mikroinstrukcí, ale záleží na rychlosti hlavní paměti
+	vymaskování a kontrola L != 0 - 9 instrukcí
+	v případě L != 0; "overhead" = příprava před prvním cyklem a flag setting - 3 mikroinstrukce
+	v případě L = 0; overhead na flag setting  - 2 mikroinstrukce
+	samotné posouvání v cyklu - 9 mikroinstrukcí
+	write DWORDu do paměti - minimálně 14 mikroinstrukcí
+	celkově: pro k posunutí (bez vymaskování!), kde k > 0, je potřeba (3 + 12 + 9 + 3 + 14) + k * 9 = 41 + 9 * k mikroinstrukcí. V případě vymaskování je to 41 + ( k mod 32 ) * 9 mikroinstrukcí. V případě, že je k mod 32 == 0, je to ale pouze 40 mikroinstrukcí.
+			pro k posunutí, kde k == 0, je potřeba (3 + 12 + 9 + 2 + 14) = 40 mikroinstrukcí.
+			počítejme, že uživatel bude používat všechny hodnoty v L od 0 do 255 se stejnou pravděpodobností.
+			Tudíž střední hodnota provedených mikroinstrukcí (po vymaskování!) je:  8 * Sum_i_from 1 to 31 (1/256) * ( 9 * i + 40 ) + Sum_i_from 1 to 8 (1/256)  40 = (8 * 31 * 32 * 9) / (256 * 2) + 41 * ( ( 8 * 31 ) / 256) + ( 8 * 40 ) / 256 = 180.47 mikroinstrukcí průměrně.
+			Což je značné zlepšení oproti tomu, kdybych bral všechny nevymaskované hodnoty L, tak bych došel k diametrálně odlišné střední hodnotě: Sum_i_from 1 to 255 (1 / 256) * ( (41 - 8) + i * 9) + (40 - 8) / 256 =  ( 33 * 255 ) / 256 + ( 9 * 256 * 255 ) / (256 * 2) + 32/256 = 1180.49. Což je 6.5 krát více. 
+			
+			V nejhorší případě (k mod 32) == 31 bude použito 41 + 31 * 9 = 320 mikroinstrukcí.
+			
+			V nejlepší případě (k mod 32) == 0 bude použito 40 mikroinstrukcí.
 	
+
+Testování:
+		Test 1:
+		
+Závěr a poznatky: Úloha byla zajímává a pěkně zkonsolidovala mé znalosti z první poloviny semestru. Vzhledem k tomu, že jsem chtěl provést cyklus posuvů na co nejméně instrukcí, tak mně trochu pozlobil fakt, že operace 1 je W shift right + CIN a též, že CZM s sebou též nese CIN = CF.
 	
 	
 

@@ -22,12 +22,25 @@ READ_H3:	{
 		OEINLH PET,		0,	0,		; zapis do registru U - nizsi
 		}
 		
-		ECS, 0, 14 ; CHECK_ZERO_L	zvysime ukazatel na pamet a rovnou testujem zero flag
+		ECS, 	0, 	0,  ; CHECK_ZERO_L	zvysime ukazatel na pamet a rovnou testujem zero flag
 ;**********************************************************************************
-
+		
+;------------------------------vymaskování L s 00011111
+		
+		OEL ECW ECF ,  2, 0 ,				; L -> W , amortizovani flagů kvůli carry!!
+		ECW     	, 15, 0, 				; shift left
+		ECW     	, 15, 0, 				; shift left
+		ECW     	, 15, 0, 				; shift left
+		ECW			, 1 , 0, 				; shift right
+		ECW			, 1 , 0, 				; shift right
+		ECW			, 1 , 0, 				; shift right
+		OEW PEL 	,  0, 0, 				; W -> L
+					,  0, 14,  CHECK_ZERO_L ; checks if L is zero
+		
+;-------------------------------kontrola L!=0
 CHECK_ZERO_L: {
-		OEU ECW	, 2 , 0 , pre_shift     ; nacteni U -> W, pokud neni nula 
-				, 0	, 0 , write;  pokud je nula, ihned zapis zpet do pameti //dodelat flag setting
+		OEU ECW			,   2, 	 0, pre_shift     ; nacteni U -> W, pokud neni nula 
+		OEU ECW ECF UCF ,  	2,   0, 	check_higher;   pokud je nula, ihned zapis zpet do pameti  U -> W a setni flagy na nizsi slovo
 		}
 pre_shift:  CFS1 ECF,	7,  0,		; setne nejnizsi bit vyssiho slova jako carry flag
 one_shift:  OEW  PEU,   0,  0,  	;  vrati U nazpet
@@ -43,10 +56,10 @@ hi_right: OEU ECW	,		2,	0,		; nacte U -> W
 		,			0,	14,		; loop
 loop:		{
 		CFS1 ECF,	7,	0,	one_shift	; L neni nulove, rovnou setnu nejnizsi bit vyssiho slova jako carry flag 
-		OEW PEU  UCF,			0,	0,	check_higher	; L je nula, zapisu w -> U A pripravim cumulative zero mode
+		OEW PEU UCF,			0,	0,	check_higher	; L je nula, zapisu w -> U A pripravim cumulative zero mode
 		}
 ;**********************************************************************************
-
+			  
 check_higher: OET ECW  ECF, 		2,  0,  	; T -> W a rovnou setnout flagy 
 
 write:		OEU ECOUTWR,		0,	0,		; U->DOUT
