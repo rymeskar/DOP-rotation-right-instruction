@@ -31,6 +31,8 @@ READ_H3:	{
 		ECW     	, 15, 0, 				; shift left
 		ECW     	, 15, 0, 				; shift left
 		ECW     	, 15, 0, 				; shift left
+		OEW PEL     , 0 , 0,                ; zpet do L, abych usekl vyšší slabiku
+		OEL ECW     , 2 , 0,                ; zpet do W, jiz oseknuta slabika
 		ECW			, 1 , 0, 				; shift right
 		ECW			, 1 , 0, 				; shift right
 		ECW			, 1 , 0, 				; shift right

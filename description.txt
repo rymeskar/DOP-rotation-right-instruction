@@ -73,8 +73,50 @@ Kvantitativní ukazatele:
 	
 
 Testování:
-		Test 1:
-		
+	Test 1:
+		před provedením:
+		S = 0004
+		D = 0010
+		PC = 0000
+		L = 8
+		--------
+		obsah paměti:
+					0000 = 91
+					0004 = FF 0005 = FF 0006 = 00 0007 = 00
+		po provedení:
+		S = 0008
+		D = 0014
+		PC = 0001
+		SIGN FLAG: 1
+		AF: 1
+		OSTATNÍ: 0
+		--------
+		obsah paměti:
+					0010 = FF
+					0011 = 00
+					0012 = 00
+					0013 = FF
+	Test 2:
+		před provedením:
+		S = 0004
+		D = 0010
+		PC = 0000
+		L = FF
+		--------
+		obsah paměti:
+					0000 = 91
+					0004 = 01 0005 = 00 0006 = 00 0007 = 00
+		po provedení:
+		S = 0008
+		D = 0014
+		PC = 0001
+		Všechny flagy: 0
+		--------
+		obsah paměti:
+					0010 = 02
+					0011 = 00
+					0012 = 00
+					0013 = 00
 Závěr a poznatky: Úloha byla zajímává a pěkně zkonsolidovala mé znalosti z první poloviny semestru. Vzhledem k tomu, že jsem chtěl provést cyklus posuvů na co nejméně instrukcí, tak mně trochu pozlobil fakt, že operace 1 je W shift right + CIN a též, že CZM s sebou též nese CIN = CF.
 	
 	
